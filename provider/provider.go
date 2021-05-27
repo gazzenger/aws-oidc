@@ -19,12 +19,13 @@ import (
 )
 
 type ProviderConfig struct {
-	ClientID     string
-	ClientSecret string
-	ProviderURL  string
-	PKCE         bool
-	Nonce        bool
-	AgentCommand []string
+	ClientID           string
+	ClientSecret       string
+	ProviderURL        string
+	PKCE               bool
+	Nonce              bool
+	AgentCommand       []string
+	ProviderReturnHTML string
 }
 
 type Result struct {
@@ -198,7 +199,13 @@ func (p ProviderConfig) Authenticate(t *OAuth2Token) error {
 			errorChannel <- errors.New("Failed to verify Claims: " + err.Error())
 			return
 		}
-		w.Write([]byte("Signed in successfully, return to cli app"))
+
+		if p.ProviderReturnHTML != "" {
+			w.Write([]byte(p.ProviderReturnHTML))
+		} else {
+			w.Write([]byte("Signed in successfully, return to cli app"))
+		}
+
 		resultChannel <- oauth2Token
 	})
 
@@ -219,7 +226,7 @@ func (p ProviderConfig) Authenticate(t *OAuth2Token) error {
 
 	//TODO Drop privileges
 	cmd := exec.Command(c[0], c[1:]...)
-	cmd.Run()
+	cmd.Start()
 
 	server := &http.Server{}
 	go func() {
