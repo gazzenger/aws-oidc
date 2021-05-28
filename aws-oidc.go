@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/BurntSushi/toml"
-	"github.com/stoggi/aws-oidc/cli"
+	"github.com/gazzenger/aws-oidc/cli"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 

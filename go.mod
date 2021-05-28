@@ -1,4 +1,4 @@
-module github.com/stoggi/aws-oidc
+module github.com/gazzenger/aws-oidc
 
 require (
 	github.com/99designs/aws-vault v4.5.1+incompatible

@@ -11,7 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/arn"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sts"
-	"github.com/stoggi/aws-oidc/provider"
+	"github.com/gazzenger/aws-oidc/provider"
 
 	"gopkg.in/alecthomas/kingpin.v2"
 )
