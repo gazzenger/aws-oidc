@@ -5,10 +5,12 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 
@@ -19,13 +21,14 @@ import (
 )
 
 type ProviderConfig struct {
-	ClientID           string
-	ClientSecret       string
-	ProviderURL        string
-	PKCE               bool
-	Nonce              bool
-	AgentCommand       []string
-	ProviderReturnHTML string
+	ClientID               string
+	ClientSecret           string
+	ProviderURL            string
+	PKCE                   bool
+	Nonce                  bool
+	AgentCommand           []string
+	ProviderReturnHTML     string
+	AgentUseDefaultBrowser bool
 }
 
 type Result struct {
@@ -209,24 +212,28 @@ func (p ProviderConfig) Authenticate(t *OAuth2Token) error {
 		resultChannel <- oauth2Token
 	})
 
-	// Filter the commands, and replace "{}" with our callback url
-	c := p.AgentCommand[:0]
-	replacedURL := false
-	for _, arg := range p.AgentCommand {
-		if arg == "{}" {
-			c = append(c, baseURL)
-			replacedURL = true
-		} else {
-			c = append(c, arg)
+	if !p.AgentUseDefaultBrowser {
+		// Filter the commands, and replace "{}" with our callback url
+		c := p.AgentCommand[:0]
+		replacedURL := false
+		for _, arg := range p.AgentCommand {
+			if arg == "{}" {
+				c = append(c, baseURL)
+				replacedURL = true
+			} else {
+				c = append(c, arg)
+			}
 		}
-	}
-	if !replacedURL {
-		c = append(c, baseURL)
-	}
+		if !replacedURL {
+			c = append(c, baseURL)
+		}
 
-	//TODO Drop privileges
-	cmd := exec.Command(c[0], c[1:]...)
-	cmd.Start()
+		//TODO Drop privileges
+		cmd := exec.Command(c[0], c[1:]...)
+		cmd.Start()
+	} else {
+		openbrowser(baseURL)
+	}
 
 	server := &http.Server{}
 	go func() {
@@ -253,4 +260,23 @@ func (p ProviderConfig) Authenticate(t *OAuth2Token) error {
 		server.Shutdown(ctx)
 		return errors.New("no oauth2 flow callback received within last 2 minutes, exiting")
 	}
+}
+
+func openbrowser(url string) {
+	var err error
+
+	switch runtime.GOOS {
+	case "linux":
+		err = exec.Command("xdg-open", url).Start()
+	case "windows":
+		err = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	case "darwin":
+		err = exec.Command("open", url).Start()
+	default:
+		err = fmt.Errorf("unsupported platform")
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+
 }
