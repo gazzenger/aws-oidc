@@ -99,3 +99,8 @@ Example using only the AWS CLI:
     EOF
 
 Note, your default profile will need `iam:ListRoles` permission. To use a different profile use the `--profile` option.
+
+## References
+Below is a list of references for things that have used for fixing issues in this repository
+- https://stackoverflow.com/a/48283226
+- https://gist.github.com/hyg/9c4afcd91fe24316cbf0

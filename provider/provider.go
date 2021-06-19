@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -95,12 +96,13 @@ func (p ProviderConfig) Authenticate(t *OAuth2Token) error {
 		return err
 	}
 
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	//determine a free port to use
+	port, err := GetFreePort()
 	if err != nil {
 		return err
 	}
-	defer listener.Close()
-	baseURL := "http://" + listener.Addr().String()
+
+	baseURL := "http://127.0.0.1:" + strconv.Itoa(port) // + listener.Addr().String()
 	redirectURL := baseURL + "/auth/callback"
 
 	oidcConfig := &oidc.Config{
@@ -160,18 +162,27 @@ func (p ProviderConfig) Authenticate(t *OAuth2Token) error {
 		authCodeOptions = append(authCodeOptions, oauth2.SetAuthURLParam("nonce", nonce))
 	}
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	myMux := http.NewServeMux()
+
+	myMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		url := config.AuthCodeURL(state, authCodeOptions...)
 		http.Redirect(w, r, url, http.StatusFound)
 	})
 
-	http.HandleFunc("/auth/callback", func(w http.ResponseWriter, r *http.Request) {
+	myMux.HandleFunc("/auth/callback", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("state") != state {
 			http.Error(w, "state did not match", http.StatusBadRequest)
 			errorChannel <- errors.New("State did not match")
 			return
 		}
-
+		//detecting an error parameter returned
+		if r.URL.Query().Get("error") != "" {
+			w.Write([]byte("<h1>Error:" + r.URL.Query().Get("error") +
+				"</h1><p>" + r.URL.Query().Get("error_description") +
+				"<br/><em>" + r.URL.Query().Get("error_uri") + "</em></p>"))
+			errorChannel <- errors.New("Error:" + r.URL.Query().Get("error") + " " + r.URL.Query().Get("error_description") + " " + r.URL.Query().Get("error_uri"))
+			return
+		}
 		oauth2Token, err := config.Exchange(ctx, r.URL.Query().Get("code"), tokenCodeOptions...)
 		if err != nil {
 			http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
@@ -235,10 +246,12 @@ func (p ProviderConfig) Authenticate(t *OAuth2Token) error {
 		openbrowser(baseURL)
 	}
 
-	server := &http.Server{}
-	go func() {
-		server.Serve(listener)
-	}()
+	// Server and Listen
+	server := &http.Server{
+		Addr:    ":" + strconv.Itoa(port),
+		Handler: myMux,
+	}
+	go server.ListenAndServe()
 
 	select {
 	case err := <-errorChannel:
@@ -262,6 +275,8 @@ func (p ProviderConfig) Authenticate(t *OAuth2Token) error {
 	}
 }
 
+// A function that can open url in the default browser on Windows, Linux or Mac
+// taken from https://gist.github.com/hyg/9c4afcd91fe24316cbf0
 func openbrowser(url string) {
 	var err error
 
@@ -279,4 +294,18 @@ func openbrowser(url string) {
 		log.Fatal(err)
 	}
 
+}
+
+// A function to determine any free ports to use
+// taken from https://stackoverflow.com/a/48283226
+func GetFreePort() (int, error) {
+	ln, err := net.Listen("tcp", ":0")
+	if err != nil {
+		return 0, err
+	}
+	err = ln.Close()
+	if err != nil {
+		return 0, err
+	}
+	return ln.Addr().(*net.TCPAddr).Port, nil
 }
