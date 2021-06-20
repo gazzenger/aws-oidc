@@ -282,7 +282,17 @@ func openbrowser(url string) {
 
 	switch runtime.GOOS {
 	case "linux":
-		err = exec.Command("xdg-open", url).Start()
+		// check if running WSL
+		// taken from https://github.com/microsoft/WSL/issues/423#issuecomment-328526847
+		cmd := "uname -r | grep -o Microsoft"
+		out, _ := exec.Command("bash", "-c", cmd).Output()
+		if string(out) == "Microsoft\n" {
+			//if Microsoft is detected, then this is running WSL
+			err = exec.Command("wslview", url).Start()
+		} else {
+			//otherwise standard linux
+			err = exec.Command("xdg-open", url).Start()
+		}
 	case "windows":
 		err = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
 	case "darwin":
